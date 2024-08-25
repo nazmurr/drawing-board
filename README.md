@@ -2,6 +2,8 @@
 
 This is a simple drawing board application built with Electron. The application allows users to draw shapes like rectangles and circles, as well as free-form drawing. It also includes an eraser tool for removing parts of the drawing and a clear canvas button to reset the entire drawing area. Additionally, users can save their drawings as PNG files.
 
+![Screenshot of Drawing Board](assets/screenshot.png)
+
 ## Features
 
 - **Draw Shapes**:
