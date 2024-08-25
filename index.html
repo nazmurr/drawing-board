@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Drawing Board</title>
+  <style>
+    body,
+    html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    canvas {
+      border: 1px solid #000;
+      display: block;
+      margin-top: 30px;
+    }
+
+    .toolbar {
+      margin-bottom: 10px;
+      position: absolute;
+      top: 0;
+      left: 10px;
+      z-index: 10;
+      background: white;
+    }
+
+    .toolbar button,
+    .toolbar input {
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+
+    .toolbar input[type="color"] {
+      height: 28px;
+      width: 38px;
+      padding: 0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="toolbar">
+    <button id="rectButton">Rectangle</button>
+    <button id="circleButton">Circle</button>
+    <button id="lineButton">Free Draw</button>
+    <button id="eraserButton">Eraser</button>
+    <button id="clearButton">Clear Canvas</button>
+    <input type="color" id="colorPicker" value="#000000">
+  </div>
+  <canvas id="drawingCanvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById('drawingCanvas');
+    const context = canvas.getContext('2d');
+    let drawing = false;
+    let startX, startY;
+    let tool = 'line';
+    let savedCanvas;
+
+    // Set initial color
+    context.strokeStyle = document.getElementById('colorPicker').value;
+
+    function resizeCanvas() {
+      const tempCanvas = document.createElement('canvas');
+      const tempContext = tempCanvas.getContext('2d');
+      tempCanvas.width = canvas.width;
+      tempCanvas.height = canvas.height;
+      tempContext.drawImage(canvas, 0, 0);
+
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      context.drawImage(tempCanvas, 0, 0);
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    document.getElementById('colorPicker').addEventListener('input', (e) => {
+      context.strokeStyle = e.target.value;
+    });
+
+    document.getElementById('rectButton').addEventListener('click', () => { tool = 'rect'; });
+    document.getElementById('circleButton').addEventListener('click', () => { tool = 'circle'; });
+    document.getElementById('lineButton').addEventListener('click', () => { tool = 'line'; });
+    document.getElementById('eraserButton').addEventListener('click', () => { tool = 'eraser'; });
+    document.getElementById('clearButton').addEventListener('click', clearCanvas);
+
+    function clearCanvas() {
+      context.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      drawing = true;
+      startX = e.offsetX;
+      startY = e.offsetY;
+      if (tool === 'line' || tool === 'eraser') {
+        context.beginPath();
+        context.moveTo(startX, startY);
+      } else {
+        savedCanvas = context.getImageData(0, 0, canvas.width, canvas.height);
+      }
+    });
+
+    canvas.addEventListener('mouseup', (e) => {
+      drawing = false;
+      const endX = e.offsetX;
+      const endY = e.offsetY;
+
+      if (tool === 'rect') {
+        context.beginPath();
+        context.rect(startX, startY, endX - startX, endY - startY);
+        context.stroke();
+      } else if (tool === 'circle') {
+        const radius = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+        context.beginPath();
+        context.arc(startX, startY, radius, 0, 2 * Math.PI);
+        context.stroke();
+      }
+      context.beginPath();
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (drawing) {
+        const currentX = e.offsetX;
+        const currentY = e.offsetY;
+
+        if (tool === 'rect' || tool === 'circle') {
+          context.putImageData(savedCanvas, 0, 0);
+
+          if (tool === 'rect') {
+            context.beginPath();
+            context.rect(startX, startY, currentX - startX, currentY - startY);
+            context.stroke();
+          } else if (tool === 'circle') {
+            const radius = Math.sqrt(Math.pow(currentX - startX, 2) + Math.pow(currentY - startY, 2));
+            context.beginPath();
+            context.arc(startX, startY, radius, 0, 2 * Math.PI);
+            context.stroke();
+          }
+        } else if (tool === 'line') {
+          context.lineTo(currentX, currentY);
+          context.stroke();
+          context.beginPath();
+          context.moveTo(currentX, currentY);
+        } else if (tool === 'eraser') {
+          context.strokeStyle = 'white';
+          context.lineWidth = 50;
+          context.lineTo(currentX, currentY);
+          context.stroke();
+          context.beginPath();
+          context.moveTo(currentX, currentY);
+          context.strokeStyle = document.getElementById('colorPicker').value;
+          context.lineWidth = 1;
+        }
+      }
+    });
+
+    canvas.addEventListener('mouseout', () => {
+      drawing = false;
+      context.beginPath();
+    });
+  </script>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      window.electron.ipcRenderer.on("save-canvas-as-png", () => {
+        
+        // Create a temporary canvas
+        const tempCanvas = document.createElement('canvas');
+        const tempContext = tempCanvas.getContext('2d');
+
+        // Set dimensions of the temporary canvas to match the original
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+
+        // Fill the temporary canvas with white
+        tempContext.fillStyle = "white";
+        tempContext.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+        // Draw the original canvas on top of the white background
+        tempContext.drawImage(canvas, 0, 0);
+
+        // Convert the temporary canvas to a data URL
+        const dataUrl = tempCanvas.toDataURL();
+
+        // Send the data URL to the main process to save the image
+        window.electron.ipcRenderer.send("save-image", dataUrl);
+
+      });
+    });
+  </script>
+</body>
+
+</html>
